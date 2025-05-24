@@ -1,0 +1,135 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              Int      @id @default(autoincrement())
+  email           String   @unique
+  username        String   @unique
+  passwordHash    String   @map("password_hash")
+  firstName       String?  @map("first_name")
+  lastName        String?  @map("last_name")
+  profileImageUrl String?  @map("profile_image_url")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  groupMemberships GroupMember[]
+  createdGroups    Group[]       @relation("GroupCreator")
+  createdDailyTasks DailyTask[]  @relation("DailyTaskCreator")
+  personalTasks    PersonalTask[]
+  taskCompletions  TaskCompletion[]
+  verifiedCompletions TaskCompletion[] @relation("CompletionVerifier")
+
+  @@map("users")
+}
+
+model Group {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  inviteCode  String   @unique @map("invite_code")
+  createdById Int      @map("created_by")
+  maxMembers  Int      @default(4) @map("max_members")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  creator      User           @relation("GroupCreator", fields: [createdById], references: [id])
+  members      GroupMember[]
+  dailyTasks   DailyTask[]
+  personalTasks PersonalTask[]
+  taskCompletions TaskCompletion[]
+
+  @@map("groups")
+}
+
+model GroupMember {
+  id       Int      @id @default(autoincrement())
+  groupId  Int      @map("group_id")
+  userId   Int      @map("user_id")
+  joinedAt DateTime @default(now()) @map("joined_at")
+  role     Role     @default(MEMBER)
+
+  // Relations
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@map("group_members")
+}
+
+model DailyTask {
+  id          Int      @id @default(autoincrement())
+  groupId     Int      @map("group_id")
+  title       String
+  description String?
+  createdById Int      @map("created_by")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  group       Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  creator     User             @relation("DailyTaskCreator", fields: [createdById], references: [id])
+  completions TaskCompletion[]
+
+  @@map("daily_tasks")
+}
+
+model PersonalTask {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  groupId     Int      @map("group_id")
+  title       String
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group       Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  completions TaskCompletion[]
+
+  @@map("personal_tasks")
+}
+
+model TaskCompletion {
+  id             Int      @id @default(autoincrement())
+  userId         Int      @map("user_id")
+  dailyTaskId    Int?     @map("daily_task_id")
+  personalTaskId Int?     @map("personal_task_id")
+  groupId        Int      @map("group_id")
+  proofImageUrl  String   @map("proof_image_url")
+  completionDate DateTime @default(now()) @map("completion_date") @db.Date
+  notes          String?
+  verifiedById   Int?     @map("verified_by")
+  isVerified     Boolean  @default(false) @map("is_verified")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group        Group         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  dailyTask    DailyTask?    @relation(fields: [dailyTaskId], references: [id], onDelete: Cascade)
+  personalTask PersonalTask? @relation(fields: [personalTaskId], references: [id], onDelete: Cascade)
+  verifiedBy   User?         @relation("CompletionVerifier", fields: [verifiedById], references: [id])
+
+  @@unique([userId, dailyTaskId, completionDate], name: "unique_daily_completion")
+  @@unique([userId, personalTaskId, completionDate], name: "unique_personal_completion")
+  @@map("task_completions")
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}

@@ -1,0 +1,80 @@
+### Health Check
+GET http://localhost:3000/health
+
+### Register User
+POST http://localhost:3000/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "username": "testuser",
+  "password": "password123",
+  "firstName": "Test",
+  "lastName": "User"
+}
+
+### Login User
+POST http://localhost:3000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "password123"
+}
+
+### Get Profile (requires token from login)
+GET http://localhost:3000/api/auth/me
+Authorization: Bearer YOUR_TOKEN_HERE
+
+### Create Group
+POST http://localhost:3000/api/groups
+Authorization: Bearer YOUR_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "name": "Test Group",
+  "description": "A test accountability group"
+}
+
+### Get User Groups
+GET http://localhost:3000/api/groups/my-groups
+Authorization: Bearer YOUR_TOKEN_HERE
+
+### Join Group (use invite code from created group)
+POST http://localhost:3000/api/groups/join
+Authorization: Bearer YOUR_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "inviteCode": "INVITE_CODE_HERE"
+}
+
+### Create Daily Task
+POST http://localhost:3000/api/tasks/groups/1/daily-tasks
+Authorization: Bearer YOUR_TOKEN_HERE
+Content-Type: application/json
+
+{
+  "title": "Morning Exercise",
+  "description": "30 minutes of physical activity"
+}
+
+### Get Group Daily Tasks
+GET http://localhost:3000/api/tasks/groups/1/daily-tasks
+Authorization: Bearer YOUR_TOKEN_HERE
+
+### Complete Daily Task (requires multipart form data)
+# POST http://localhost:3000/api/tasks/complete/daily/1
+# Authorization: Bearer YOUR_TOKEN_HERE
+# Content-Type: multipart/form-data
+# 
+# proofImage: (file)
+# notes: Completed my morning workout!
+
+### Get Group Completions
+GET http://localhost:3000/api/tasks/groups/1/completions
+Authorization: Bearer YOUR_TOKEN_HERE
+
+### Get User Stats
+GET http://localhost:3000/api/users/stats?period=week
+Authorization: Bearer YOUR_TOKEN_HERE 
