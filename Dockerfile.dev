@@ -4,8 +4,8 @@ FROM node:18-alpine
 # Set working directory
 WORKDIR /app
 
-# Install curl for health checks
-RUN apk add --no-cache curl
+# Install curl and OpenSSL for health checks and Prisma compatibility
+RUN apk add --no-cache curl openssl1.1-compat
 
 # Copy package files
 COPY package*.json ./

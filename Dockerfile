@@ -1,19 +1,22 @@
 # Use official Node.js runtime as base image
 FROM node:18-alpine AS base
 
+# Install OpenSSL for Prisma compatibility
+RUN apk add --no-cache openssl1.1-compat
+
 # Set working directory
 WORKDIR /app
 
 # Copy package files for dependency installation
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Install dependencies (use npm install instead of npm ci for more flexibility)
+RUN npm install --only=production && npm cache clean --force
 
 # Copy Prisma schema first (for generating client)
 COPY prisma ./prisma
 
-# Generate Prisma client
+# Generate Prisma client with correct engine
 RUN npx prisma generate
 
 # Copy application source code

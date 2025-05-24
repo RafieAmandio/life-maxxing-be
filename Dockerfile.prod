@@ -1,0 +1,60 @@
+# Multi-stage production Dockerfile
+FROM node:18-alpine AS dependencies
+
+# Install OpenSSL for Prisma compatibility
+RUN apk add --no-cache openssl1.1-compat
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Clean install dependencies with fallback
+RUN npm ci --only=production || npm install --only=production
+
+# Copy Prisma schema and generate client
+COPY prisma ./prisma
+RUN npx prisma generate
+
+# Production stage
+FROM node:18-alpine AS production
+
+# Install dumb-init and OpenSSL for proper signal handling and Prisma compatibility
+RUN apk add --no-cache dumb-init openssl1.1-compat
+
+# Create app directory
+WORKDIR /app
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodeuser -u 1001
+
+# Copy dependencies from previous stage
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY --from=dependencies /app/prisma ./prisma
+
+# Copy application source
+COPY . .
+
+# Create uploads directory
+RUN mkdir -p uploads/avatars uploads/proofs
+
+# Change ownership to nodeuser
+RUN chown -R nodeuser:nodejs /app
+
+# Switch to non-root user
+USER nodeuser
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start the application
+CMD ["node", "server.js"] 

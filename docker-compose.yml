@@ -19,7 +19,9 @@ services:
 
   # Backend API
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
     container_name: lifemaxxing-backend
     restart: unless-stopped
     environment:
@@ -37,11 +39,18 @@ services:
       - postgres
     networks:
       - lifemaxxing-network
-    # Run migrations on startup
+    # Wait for database and run migrations
     command: >
       sh -c "
+        echo 'Waiting for database...' &&
+        until node -e \"require('pg').Client({connectionString: process.env.DATABASE_URL}).connect().then(() => process.exit(0)).catch(() => process.exit(1))\" 2>/dev/null; do
+          echo 'Database not ready, waiting...'
+          sleep 2
+        done &&
+        echo 'Database ready, running migrations...' &&
         npx prisma migrate deploy &&
-        npm start
+        echo 'Starting server...' &&
+        node server.js
       "
 
   # Optional: Database administration tool

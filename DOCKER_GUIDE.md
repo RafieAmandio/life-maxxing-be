@@ -6,7 +6,9 @@ This guide explains how to run the Life Maxxing backend using Docker for both de
 
 ## 🏗️ Files Created
 
-- `Dockerfile` - Production-optimized container
+- `Dockerfile` - Standard production container
+- `Dockerfile.prod` - Multi-stage production build (recommended)
+- `Dockerfile.simple` - Simple, reliable build for deployment platforms
 - `Dockerfile.dev` - Development container with hot reloading
 - `docker-compose.yml` - Production setup with PostgreSQL
 - `docker-compose.dev.yml` - Development setup
@@ -46,6 +48,26 @@ docker-compose up --build -d
 3. **Stop production environment:**
 ```bash
 docker-compose down
+```
+
+## 🛠️ Dockerfile Options
+
+### Dockerfile.prod (Recommended)
+Multi-stage build with optimizations:
+```bash
+docker build -f Dockerfile.prod -t lifemaxxing-backend .
+```
+
+### Dockerfile.simple (Most Compatible)
+Simple, reliable build for deployment platforms:
+```bash
+docker build -f Dockerfile.simple -t lifemaxxing-backend .
+```
+
+### Dockerfile (Standard)
+Basic production build:
+```bash
+docker build -t lifemaxxing-backend .
 ```
 
 ## 🛠️ Detailed Commands
@@ -174,6 +196,20 @@ docker-compose exec -T postgres psql -U postgres lifemaxxing < backup.sql
 
 ### Common Issues
 
+**Package-lock.json sync error (npm ci fails):**
+```bash
+# This error occurs when package.json and package-lock.json are out of sync
+npm error `npm ci` can only install packages when your package.json and package-lock.json are in sync
+
+# Solution 1: Regenerate lock file locally
+npm install
+
+# Solution 2: Use the simple Dockerfile
+docker build -f Dockerfile.simple -t lifemaxxing-backend .
+
+# Solution 3: Force npm install in Dockerfile (already implemented)
+```
+
 **Port already in use:**
 ```bash
 # Check what's using the port
@@ -199,6 +235,32 @@ docker-compose exec backend npx prisma generate
 ```bash
 # Fix upload directory permissions
 docker-compose exec backend chmod -R 755 uploads
+```
+
+**Build context too large:**
+```bash
+# Check .dockerignore is properly configured
+# Remove node_modules before building
+rm -rf node_modules
+docker build . -t lifemaxxing-backend
+```
+
+### Platform-Specific Issues
+
+**EasyPanel/Deployment Platforms:**
+- Use `Dockerfile.simple` for maximum compatibility
+- Ensure package-lock.json is up to date
+- Check platform-specific environment variable requirements
+
+**Memory Issues:**
+```bash
+# Add to docker-compose.yml under backend service:
+deploy:
+  resources:
+    limits:
+      memory: 1G
+    reservations:
+      memory: 512M
 ```
 
 ### Clean Up
@@ -262,6 +324,7 @@ services:
 - [ ] Configure monitoring
 - [ ] Set resource limits
 - [ ] Enable log rotation
+- [ ] Update package-lock.json (`npm install`)
 
 ## 📊 Monitoring
 
@@ -305,9 +368,34 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Build Docker image
-        run: docker build -t lifemaxxing-backend .
+        run: docker build -f Dockerfile.simple -t lifemaxxing-backend .
       - name: Run tests
         run: docker run --rm lifemaxxing-backend npm test
+```
+
+## 🆘 Emergency Fixes
+
+### Quick Fix for Deployment Issues
+
+If you're having persistent build issues on deployment platforms:
+
+1. **Use the simple Dockerfile:**
+```bash
+# Copy Dockerfile.simple to Dockerfile
+cp Dockerfile.simple Dockerfile
+```
+
+2. **Or specify it in your deployment config:**
+```yaml
+# In your deployment platform, specify:
+dockerfile: Dockerfile.simple
+```
+
+3. **Emergency package.json fix:**
+```bash
+# Delete package-lock.json and regenerate
+rm package-lock.json
+npm install
 ```
 
 This Docker setup provides a complete, scalable solution for developing and deploying the Life Maxxing backend application! 

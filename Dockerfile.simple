@@ -1,0 +1,41 @@
+# Simple, reliable Dockerfile for deployment platforms
+FROM node:18-alpine
+
+# Install OpenSSL for Prisma compatibility
+RUN apk add --no-cache openssl1.1-compat wget
+
+# Set working directory
+WORKDIR /app
+
+# Set Prisma environment variables for correct engine generation
+ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
+ENV PRISMA_GENERATE_SKIP_BINARY_DOWNLOAD=false
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including dev for build)
+RUN npm install
+
+# Copy prisma files and generate client
+COPY prisma ./prisma
+RUN npx prisma generate
+
+# Copy all source code
+COPY . .
+
+# Create uploads directory
+RUN mkdir -p uploads/avatars uploads/proofs
+
+# Set permissions
+RUN chmod -R 755 uploads
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+
+# Start application
+CMD ["npm", "start"] 
