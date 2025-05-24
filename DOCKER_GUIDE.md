@@ -6,9 +6,10 @@ This guide explains how to run the Life Maxxing backend using Docker for both de
 
 ## 🏗️ Files Created
 
-- `Dockerfile` - Standard production container
+- `Dockerfile` - Standard production container (Alpine + OpenSSL fix)
 - `Dockerfile.prod` - Multi-stage production build (recommended)
 - `Dockerfile.simple` - Simple, reliable build for deployment platforms
+- `Dockerfile.debian` - Debian-based build for maximum Prisma compatibility
 - `Dockerfile.dev` - Development container with hot reloading
 - `docker-compose.yml` - Production setup with PostgreSQL
 - `docker-compose.dev.yml` - Development setup
@@ -64,10 +65,49 @@ Simple, reliable build for deployment platforms:
 docker build -f Dockerfile.simple -t lifemaxxing-backend .
 ```
 
+### Dockerfile.debian (Prisma Issues Fix)
+Debian-based build for maximum compatibility:
+```bash
+docker build -f Dockerfile.debian -t lifemaxxing-backend .
+```
+
 ### Dockerfile (Standard)
-Basic production build:
+Basic production build with Alpine + OpenSSL:
 ```bash
 docker build -t lifemaxxing-backend .
+```
+
+## 🐛 Prisma + Alpine Linux Issues
+
+### Common Error
+```
+Error loading shared library libssl.so.1.1: No such file or directory
+PrismaClientInitializationError: Unable to require libquery_engine-linux-musl.so.node
+```
+
+### Solutions (In Order of Preference)
+
+**1. Use Fixed Alpine Dockerfiles (Already Implemented)**
+All Alpine-based Dockerfiles now include `openssl1.1-compat`:
+```dockerfile
+RUN apk add --no-cache openssl1.1-compat
+```
+
+**2. Use Debian-Based Dockerfile**
+```bash
+docker build -f Dockerfile.debian -t lifemaxxing-backend .
+```
+
+**3. Force Engine Regeneration**
+```bash
+# In container
+npm install
+npx prisma generate --force-version
+```
+
+**4. Use Different Node.js Base Image**
+```dockerfile
+FROM node:18-slim  # Instead of node:18-alpine
 ```
 
 ## 🛠️ Detailed Commands
@@ -196,6 +236,20 @@ docker-compose exec -T postgres psql -U postgres lifemaxxing < backup.sql
 
 ### Common Issues
 
+**Prisma Engine Loading Error:**
+```bash
+# Error: libssl.so.1.1: No such file or directory
+# Solution 1: Use Dockerfile.debian
+docker build -f Dockerfile.debian -t lifemaxxing-backend .
+
+# Solution 2: Regenerate Prisma client in container
+docker-compose exec backend sh
+npm install
+npx prisma generate
+
+# Solution 3: Use corrected Alpine Dockerfiles (already implemented)
+```
+
 **Package-lock.json sync error (npm ci fails):**
 ```bash
 # This error occurs when package.json and package-lock.json are out of sync
@@ -249,6 +303,7 @@ docker build . -t lifemaxxing-backend
 
 **EasyPanel/Deployment Platforms:**
 - Use `Dockerfile.simple` for maximum compatibility
+- If Prisma issues persist, use `Dockerfile.debian`
 - Ensure package-lock.json is up to date
 - Check platform-specific environment variable requirements
 
@@ -325,6 +380,7 @@ services:
 - [ ] Set resource limits
 - [ ] Enable log rotation
 - [ ] Update package-lock.json (`npm install`)
+- [ ] Test Prisma compatibility (use Dockerfile.debian if issues)
 
 ## 📊 Monitoring
 
@@ -379,23 +435,30 @@ jobs:
 
 If you're having persistent build issues on deployment platforms:
 
-1. **Use the simple Dockerfile:**
+1. **For Prisma Engine Issues:**
 ```bash
-# Copy Dockerfile.simple to Dockerfile
+# Use Debian-based Dockerfile
+cp Dockerfile.debian Dockerfile
+```
+
+2. **For Alpine Linux Issues:**
+```bash
+# Use the simple Dockerfile with OpenSSL fix
 cp Dockerfile.simple Dockerfile
 ```
 
-2. **Or specify it in your deployment config:**
-```yaml
-# In your deployment platform, specify:
-dockerfile: Dockerfile.simple
-```
-
-3. **Emergency package.json fix:**
+3. **For npm Issues:**
 ```bash
 # Delete package-lock.json and regenerate
 rm package-lock.json
 npm install
 ```
+
+### Dockerfile Priority for Different Issues
+
+**Prisma Engine Errors:** `Dockerfile.debian` → `Dockerfile.simple` → `Dockerfile.prod`  
+**Build Speed:** `Dockerfile.simple` → `Dockerfile` → `Dockerfile.prod`  
+**Security:** `Dockerfile.prod` → `Dockerfile` → `Dockerfile.simple`  
+**Compatibility:** `Dockerfile.debian` → `Dockerfile.simple` → `Dockerfile`
 
 This Docker setup provides a complete, scalable solution for developing and deploying the Life Maxxing backend application! 
