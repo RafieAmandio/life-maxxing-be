@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: lifemaxxing-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: lifemaxxing
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - lifemaxxing-network
+
+  # Backend API
+  backend:
+    build: .
+    container_name: lifemaxxing-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:password123@postgres:5432/lifemaxxing?schema=public
+      JWT_SECRET: your_super_secret_jwt_key_change_this_in_production
+      UPLOAD_PATH: ./uploads
+      MAX_FILE_SIZE: 5242880
+    ports:
+      - "3000:3000"
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      - postgres
+    networks:
+      - lifemaxxing-network
+    # Run migrations on startup
+    command: >
+      sh -c "
+        npx prisma migrate deploy &&
+        npm start
+      "
+
+  # Optional: Database administration tool
+  adminer:
+    image: adminer:latest
+    container_name: lifemaxxing-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      - postgres
+    networks:
+      - lifemaxxing-network
+
+volumes:
+  postgres_data:
+    driver: local
+  uploads_data:
+    driver: local
+
+networks:
+  lifemaxxing-network:
+    driver: bridge 
